@@ -626,7 +626,7 @@ export async function analyzeWinterRisks(): Promise<RiskAnalysisResult[]> {
     roadData.features.forEach((feature, idx) => {
       const center = getCenterFromGeometry(feature.geometry);
       const props = feature.properties;
-      const rdType = props.rd_type || props.RD_TYPE || '';
+      const rdType = String(props.rd_type || props.RD_TYPE || '');
 
       // 고속도로, 국도만 필터링
       if (rdType.includes('고속') || rdType.includes('국도')) {

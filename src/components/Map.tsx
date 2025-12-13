@@ -153,39 +153,28 @@ export default function Map({ zones, mode, onZoneClick }: MapProps) {
 
                 {/* Details */}
                 <div className="text-xs text-slate-400 space-y-1 border-t border-slate-700 pt-2">
-                  {/* 공통 */}
-                  {zone.details.sgg_nm && <div>시군구: {String(zone.details.sgg_nm)}</div>}
-
-                  {/* 침수 */}
-                  {zone.details.grid_code !== undefined && (
+                  {zone.details.sgg_nm ? <div>시군구: {String(zone.details.sgg_nm)}</div> : null}
+                  {zone.details.grid_code !== undefined ? (
                     <div>침수깊이등급: {String(zone.details.grid_code)}</div>
-                  )}
-                  {zone.details.impervious_rate !== undefined && (
+                  ) : null}
+                  {zone.details.impervious_rate !== undefined ? (
                     <div>불투수면율: {String(zone.details.impervious_rate)}%</div>
-                  )}
-
-                  {/* 결빙 */}
-                  {zone.details.slope !== undefined && (
+                  ) : null}
+                  {zone.details.slope !== undefined ? (
                     <div>경사도: {String(zone.details.slope)}°</div>
-                  )}
-                  {zone.details.river_name && (
+                  ) : null}
+                  {zone.details.river_name ? (
                     <div>하천명: {String(zone.details.river_name)}</div>
-                  )}
-
-                  {/* 산사태 */}
-                  {zone.details.emd_nm && <div>읍면동: {String(zone.details.emd_nm)}</div>}
-
-                  {/* 폭염/쉼터 */}
-                  {zone.details.climate_score !== undefined && (
+                  ) : null}
+                  {zone.details.emd_nm ? <div>읍면동: {String(zone.details.emd_nm)}</div> : null}
+                  {zone.details.climate_score !== undefined ? (
                     <div>기후취약점수: {String(zone.details.climate_score)}</div>
-                  )}
-                  {zone.details.address && <div>주소: {String(zone.details.address)}</div>}
-                  {zone.details.tel && <div>연락처: {String(zone.details.tel)}</div>}
-                  {zone.details.capacity !== undefined && (
+                  ) : null}
+                  {zone.details.address ? <div>주소: {String(zone.details.address)}</div> : null}
+                  {zone.details.tel ? <div>연락처: {String(zone.details.tel)}</div> : null}
+                  {zone.details.capacity !== undefined ? (
                     <div>수용인원: {String(zone.details.capacity)}명</div>
-                  )}
-
-                  {/* 데이터 소스 */}
+                  ) : null}
                   <div className="text-slate-500 mt-1">
                     출처: {zone.source_layer}
                   </div>
