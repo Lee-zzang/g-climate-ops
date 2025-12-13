@@ -15,6 +15,7 @@ export const winterRiskZones: RiskZone[] = [
     reason: '음지 급경사 구간 - 태양광 잠재량 최하위',
     status: '조치필요',
     mode: 'winter',
+    source_layer: 'slop_20_ovr',
     details: {
       temperature: -2,
       slope: 12.5,
@@ -29,6 +30,7 @@ export const winterRiskZones: RiskZone[] = [
     reason: '북향 경사면 - 결빙 잔존 시간 최장',
     status: '조치필요',
     mode: 'winter',
+    source_layer: 'slop_20_ovr',
     details: {
       temperature: -3,
       slope: 15.2,
@@ -43,6 +45,7 @@ export const winterRiskZones: RiskZone[] = [
     reason: '고가 그늘 구간 - 상시 음지',
     status: '조치중',
     mode: 'winter',
+    source_layer: 'sprd_rw_41',
     details: {
       temperature: -1,
       slope: 3.5,
@@ -57,6 +60,7 @@ export const winterRiskZones: RiskZone[] = [
     reason: '산악 음지 + 급경사 복합 위험',
     status: '조치필요',
     mode: 'winter',
+    source_layer: 'mountdstc_rvr',
     details: {
       temperature: -4,
       slope: 18.7,
@@ -71,6 +75,7 @@ export const winterRiskZones: RiskZone[] = [
     reason: '터널 출구 급격한 온도차',
     status: '조치중',
     mode: 'winter',
+    source_layer: 'sprd_rw_41',
     details: {
       temperature: -2,
       slope: 5.2,
@@ -85,6 +90,7 @@ export const winterRiskZones: RiskZone[] = [
     reason: '호수 인접 습기 + 음지',
     status: '조치필요',
     mode: 'winter',
+    source_layer: 'sprd_rw_41',
     details: {
       temperature: -3,
       slope: 7.8,
@@ -99,6 +105,7 @@ export const winterRiskZones: RiskZone[] = [
     reason: '육교 그늘 + 교통량 적어 제설 지연',
     status: '완료',
     mode: 'winter',
+    source_layer: 'sprd_rw_41',
     details: {
       temperature: -1,
       slope: 2.1,
@@ -119,6 +126,7 @@ export const summerRiskZones: RiskZone[] = [
     reason: '배수 불량 + 불투수면 밀집 저지대',
     status: '조치필요',
     mode: 'summer',
+    source_layer: 'impvs',
     details: {
       rainfall: 50,
       impervious_rate: 92,
@@ -133,6 +141,7 @@ export const summerRiskZones: RiskZone[] = [
     reason: '지하차도 구조 + 집중호우 시 급속 침수',
     status: '조치필요',
     mode: 'summer',
+    source_layer: 'cfm_sgg_41_100yr_1h',
     details: {
       rainfall: 60,
       impervious_rate: 100,
@@ -147,6 +156,7 @@ export const summerRiskZones: RiskZone[] = [
     reason: '해안 저지대 + 배수 시설 노후',
     status: '조치중',
     mode: 'summer',
+    source_layer: 'cfm_sgg_41_100yr_1h',
     details: {
       rainfall: 45,
       impervious_rate: 88,
@@ -161,6 +171,7 @@ export const summerRiskZones: RiskZone[] = [
     reason: '대규모 불투수면 + 우수관 용량 부족',
     status: '조치필요',
     mode: 'summer',
+    source_layer: 'impvs',
     details: {
       rainfall: 55,
       impervious_rate: 95,
@@ -175,6 +186,7 @@ export const summerRiskZones: RiskZone[] = [
     reason: '농경지 유출수 집중 구간',
     status: '조치중',
     mode: 'summer',
+    source_layer: 'tm_fldn_trce',
     details: {
       rainfall: 70,
       impervious_rate: 45,
@@ -189,6 +201,7 @@ export const summerRiskZones: RiskZone[] = [
     reason: '호수 범람 위험 + 저지대',
     status: '완료',
     mode: 'summer',
+    source_layer: 'tm_fldn_trce',
     details: {
       rainfall: 40,
       impervious_rate: 60,
@@ -203,6 +216,7 @@ export const summerRiskZones: RiskZone[] = [
     reason: '하천 범람 위험 + 배수 불량',
     status: '조치필요',
     mode: 'summer',
+    source_layer: 'ntn_rvr',
     details: {
       rainfall: 65,
       impervious_rate: 78,
