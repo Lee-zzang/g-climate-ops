@@ -6,7 +6,8 @@
  */
 
 // API 설정
-const API_KEY = "4c58df36-82b2-40b2-b360-6450cca44b1e";
+// const API_KEY = "..." (삭제)
+const API_KEY = process.env.NEXT_PUBLIC_GG_CLIMATE_API_KEY || "";
 const BASE_URL = "https://climate.gg.go.kr/ols/api/geoserver/wfs";
 
 // ============================================
