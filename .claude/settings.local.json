@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(vercel --version:*)",
+      "Skill(vibe-hackathon)",
+      "Bash(vercel:*)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFix Map component and update gitignore\n\n- Simplify Map.tsx component structure\n- Update gg-climate-api.ts configuration\n- Add entries to .gitignore\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)",
+      "Bash(gh auth:*)",
+      "Bash(where:*)",
+      "Bash(git config:*)",
+      "Bash(winget install:*)",
+      "Bash(\"C:\\Program Files\\GitHub CLI\\gh.exe\" auth status)",
+      "Bash(\"C:\\Program Files\\GitHub CLI\\gh.exe\" repo create g-climate-ops --public --source=. --remote=origin --push)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(explorer \"C:\\Users\\user\\Downloads\\hackathon-setup\\hackathon-setup\\g-climate-ops\")"
+    ]
+  }
+}
