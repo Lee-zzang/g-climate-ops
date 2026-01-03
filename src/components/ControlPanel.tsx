@@ -11,7 +11,10 @@ import {
   Clock,
   Home,
   Database,
+  CloudSun,
+  ThermometerSun,
 } from 'lucide-react';
+import type { WeatherCondition } from '@/lib/weather-api';
 
 interface ControlPanelProps {
   mode: OperationMode;
@@ -19,6 +22,7 @@ interface ControlPanelProps {
   summary: RiskSummary;
   isLoading: boolean;
   dataSources?: string[];
+  weatherCondition?: WeatherCondition | null;
 }
 
 // 모드별 아이콘 컴포넌트
@@ -62,15 +66,29 @@ const getAccentColor = (mode: OperationMode) => {
   return colors[mode];
 };
 
+// 모드-날씨 매핑
+const modeWeatherMap: Record<OperationMode, keyof WeatherCondition['modeReasons']> = {
+  winter: 'winter',
+  summer: 'summer',
+  landslide: 'landslide',
+  heat: 'heat',
+};
+
 export default function ControlPanel({
   mode,
   onModeChange,
   summary,
   isLoading,
   dataSources = [],
+  weatherCondition,
 }: ControlPanelProps) {
   const modeInfo = MODE_INFO[mode];
   const modes: OperationMode[] = ['winter', 'summer', 'landslide', 'heat'];
+
+  // 현재 날씨 정보
+  const currentTemp = weatherCondition?.current?.temperature;
+  const currentSky = weatherCondition?.current?.sky;
+  const currentPrecipType = weatherCondition?.current?.precipitationType;
 
   return (
     <div className="bg-slate-900/90 backdrop-blur border-b border-slate-700/50 px-6 py-4">
@@ -91,15 +109,30 @@ export default function ControlPanel({
           {modes.map((m) => {
             const info = MODE_INFO[m];
             const isActive = mode === m;
+            const weatherKey = modeWeatherMap[m];
+            const modeReason = weatherCondition?.modeReasons?.[weatherKey];
+            const isWeatherActive = modeReason?.active ?? false;
+
             return (
               <button
                 key={m}
                 onClick={() => onModeChange(m)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${getModeColors(m, isActive)}`}
+                className={`relative flex items-center gap-2 px-3 py-2 rounded-md transition-all ${getModeColors(m, isActive)}`}
+                title={modeReason?.reason || '날씨 정보 없음'}
               >
                 <ModeIcon mode={m} className="w-4 h-4" />
                 <span className="font-medium text-sm">{info.labelEn}</span>
                 <span className="text-xs opacity-70 hidden lg:inline">{info.label}</span>
+
+                {/* 날씨 조건 상태 표시 */}
+                {weatherCondition && (
+                  <span
+                    className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-slate-800 ${
+                      isWeatherActive ? 'bg-green-500' : 'bg-slate-500'
+                    }`}
+                    title={isWeatherActive ? '현재 조건 충족' : '조건 미충족'}
+                  />
+                )}
               </button>
             );
           })}
@@ -183,17 +216,55 @@ export default function ControlPanel({
             </span>
           </div>
 
-          {/* 데이터 소스 표시 */}
-          {dataSources.length > 0 && (
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Database className="w-3 h-3" />
-              <span>
-                {dataSources.slice(0, 2).join(', ')}
-                {dataSources.length > 2 && ` 외 ${dataSources.length - 2}개`}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {/* 현재 날씨 표시 */}
+            {weatherCondition && (
+              <div className="flex items-center gap-3 px-3 py-1 bg-slate-800/50 rounded-lg">
+                <ThermometerSun className="w-4 h-4 text-slate-400" />
+                <span className="text-sm text-slate-300">
+                  {currentTemp !== undefined ? `${currentTemp.toFixed(1)}°C` : '--'}
+                </span>
+                <span className="text-xs text-slate-500">
+                  {currentSky || ''} {currentPrecipType !== '없음' ? `/ ${currentPrecipType}` : ''}
+                </span>
+
+                {/* 현재 모드 조건 충족 여부 */}
+                {weatherCondition.modeReasons[modeWeatherMap[mode]] && (
+                  <span
+                    className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${
+                      weatherCondition.modeReasons[modeWeatherMap[mode]].active
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'bg-slate-600/30 text-slate-400 border border-slate-600/30'
+                    }`}
+                  >
+                    {weatherCondition.modeReasons[modeWeatherMap[mode]].active
+                      ? '⚡ 조건 충족'
+                      : '조건 미충족'}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* 데이터 소스 표시 */}
+            {dataSources.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Database className="w-3 h-3" />
+                <span>
+                  {dataSources.slice(0, 2).join(', ')}
+                  {dataSources.length > 2 && ` 외 ${dataSources.length - 2}개`}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* 현재 모드 조건 상세 설명 */}
+        {weatherCondition?.modeReasons[modeWeatherMap[mode]] && (
+          <div className="mt-2 text-xs text-slate-400">
+            <CloudSun className="w-3 h-3 inline mr-1" />
+            {weatherCondition.modeReasons[modeWeatherMap[mode]].reason}
+          </div>
+        )}
       </div>
     </div>
   );

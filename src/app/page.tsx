@@ -8,6 +8,7 @@ import ResourceDashboard from '@/components/ResourceDashboard';
 import AlertGenerator from '@/components/AlertGenerator';
 import ReportGenerator from '@/components/ReportGenerator';
 import WeatherPanel from '@/components/WeatherPanel';
+import DeploymentPanel from '@/components/DeploymentPanel';
 import {
   OperationMode,
   RiskZone,
@@ -26,6 +27,7 @@ import {
   Personnel,
   AIRecommendation,
 } from '@/types/advisor';
+import { DeploymentSuggestion } from '@/lib/ai-advisor';
 import {
   generateAIBriefing,
   generateEmergencyAlert,
@@ -35,6 +37,11 @@ import {
   getMockPersonnel,
   getMockWeather,
 } from '@/lib/ai-advisor';
+import {
+  getCurrentWeatherCondition,
+  isModeActiveForWeather,
+  type WeatherCondition,
+} from '@/lib/weather-api';
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -86,6 +93,8 @@ export default function Home() {
   const [personnel, setPersonnel] = useState<Personnel>({ total: 0, onDuty: 0, deployed: 0, available: 0 });
   const [alert, setAlert] = useState<EmergencyAlert | null>(null);
   const [report, setReport] = useState<SituationReport | null>(null);
+  const [weatherCondition, setWeatherCondition] = useState<WeatherCondition | null>(null);
+  const [isModeInactive, setIsModeInactive] = useState(false);
 
   // UI 상태
   const [showLeftPanel, setShowLeftPanel] = useState(true);
@@ -144,9 +153,65 @@ export default function Home() {
     }
   }, []);
 
+  // 날씨 조건 조회 (페이지 로드 시)
   useEffect(() => {
-    fetchRiskData(mode);
-  }, [mode, fetchRiskData]);
+    const fetchWeather = async () => {
+      try {
+        const condition = await getCurrentWeatherCondition();
+        setWeatherCondition(condition);
+
+        // AI 로그에 날씨 상태 추가
+        const activeMode = condition.recommendedMode;
+        if (activeMode) {
+          const newMessage: AgentMessage = {
+            id: `weather-${Date.now()}`,
+            timestamp: new Date(),
+            message: `🌡️ [기상청] ${condition.current.temperature.toFixed(1)}°C, ${condition.current.sky}. 권장 모드: ${activeMode}`,
+            type: 'info',
+          };
+          setMessages((prev) => [newMessage, ...prev]);
+        }
+      } catch (err) {
+        console.error('날씨 조건 조회 실패:', err);
+      }
+    };
+
+    fetchWeather();
+    // 10분마다 날씨 갱신
+    const interval = setInterval(fetchWeather, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 모드 변경 시 날씨 조건 확인 후 데이터 로드
+  useEffect(() => {
+    if (weatherCondition) {
+      const modeKey = mode as 'winter' | 'summer' | 'landslide' | 'heat';
+      const isActive = isModeActiveForWeather(modeKey, weatherCondition);
+      setIsModeInactive(!isActive);
+
+      if (isActive) {
+        fetchRiskData(mode);
+      } else {
+        // 조건 미충족 시 데이터 초기화
+        setZones([]);
+        setSummary(DEFAULT_SUMMARY);
+        setIsLoading(false);
+
+        // 조건 미충족 메시지 추가
+        const reason = weatherCondition.modeReasons[modeKey]?.reason || '현재 기상 조건에 맞지 않음';
+        const newMessage: AgentMessage = {
+          id: `inactive-${Date.now()}`,
+          timestamp: new Date(),
+          message: `⚠️ [조건 미충족] ${MODE_INFO[mode].label} 모드 비활성. ${reason}`,
+          type: 'warning',
+        };
+        setMessages([newMessage]);
+      }
+    } else {
+      // 날씨 정보 없으면 일단 데이터 로드
+      fetchRiskData(mode);
+    }
+  }, [mode, weatherCondition, fetchRiskData]);
 
   const handleModeChange = (newMode: OperationMode) => {
     setMode(newMode);
@@ -181,6 +246,25 @@ export default function Home() {
     setShowAlert(false);
   };
 
+  const handleDispatch = (suggestion: DeploymentSuggestion) => {
+    const newMessage: AgentMessage = {
+      id: `dispatch-${Date.now()}`,
+      timestamp: new Date(),
+      message: `🚛 [출동지시] ${suggestion.vehicle.name} → ${suggestion.targetZone.name} (${suggestion.estimatedArrival}분 예상)`,
+      type: 'action',
+    };
+    setMessages((prev) => [...prev, newMessage]);
+
+    // 장비 상태 업데이트
+    setVehicles((prev) =>
+      prev.map((v) =>
+        v.id === suggestion.vehicle.id
+          ? { ...v, status: '출동중' as const, eta: suggestion.estimatedArrival }
+          : v
+      )
+    );
+  };
+
   const modeInfo = MODE_INFO[mode];
 
   const getAccentClass = () => {
@@ -206,6 +290,7 @@ export default function Home() {
           summary={summary}
           isLoading={isLoading}
           dataSources={dataSources}
+          weatherCondition={weatherCondition}
         />
 
         {/* User Info & Logout */}
@@ -229,28 +314,57 @@ export default function Home() {
         {/* Left Panel - AI 참모 */}
         {showLeftPanel && (
           <div className="w-80 flex flex-col gap-3 p-3 overflow-y-auto border-r border-slate-800">
-            {/* AI 브리핑 */}
-            <AIBriefingPanel
-              briefing={briefing}
-              mode={mode}
-              onExecuteRecommendation={handleExecuteRecommendation}
-              isLoading={isLoading}
-            />
+            {isModeInactive ? (
+              /* 조건 미충족 시 간단한 상태 표시 */
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+                <div className={`w-16 h-16 mb-4 rounded-full flex items-center justify-center opacity-50 ${
+                  mode === 'winter' ? 'bg-purple-500/20' :
+                  mode === 'summer' ? 'bg-blue-500/20' :
+                  mode === 'landslide' ? 'bg-orange-500/20' : 'bg-red-500/20'
+                }`}>
+                  <span className="text-3xl">{modeInfo.icon}</span>
+                </div>
+                <p className="text-slate-500 text-sm mb-2">
+                  {modeInfo.label} 모드 비활성
+                </p>
+                <p className="text-slate-600 text-xs">
+                  현재 기상 조건에 해당하지 않습니다
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* AI 브리핑 */}
+                <AIBriefingPanel
+                  briefing={briefing}
+                  mode={mode}
+                  onExecuteRecommendation={handleExecuteRecommendation}
+                  isLoading={isLoading}
+                />
 
-            {/* 기상/예측 */}
-            <WeatherPanel
-              weather={weather}
-              predictions={briefing?.riskPrediction || []}
-              mode={mode}
-            />
+                {/* 기상/예측 */}
+                <WeatherPanel
+                  weather={weather}
+                  predictions={briefing?.riskPrediction || []}
+                  mode={mode}
+                />
 
-            {/* 자원 현황 */}
-            <ResourceDashboard
-              mode={mode}
-              resources={resources}
-              personnel={personnel}
-              vehicles={vehicles}
-            />
+                {/* 자원 현황 */}
+                <ResourceDashboard
+                  mode={mode}
+                  resources={resources}
+                  personnel={personnel}
+                  vehicles={vehicles}
+                />
+
+                {/* AI 배치 건의 */}
+                <DeploymentPanel
+                  mode={mode}
+                  zones={zones}
+                  vehicles={vehicles}
+                  onDispatch={handleDispatch}
+                />
+              </>
+            )}
           </div>
         )}
 
@@ -270,6 +384,52 @@ export default function Home() {
         {/* Map Area */}
         <div className="flex-1 relative">
           <Map zones={zones} mode={mode} onZoneClick={handleZoneClick} />
+
+          {/* 조건 미충족 오버레이 */}
+          {isModeInactive && weatherCondition && (
+            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[900]">
+              <div className="text-center max-w-md p-8">
+                <div className={`w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center ${
+                  mode === 'winter' ? 'bg-purple-500/20' :
+                  mode === 'summer' ? 'bg-blue-500/20' :
+                  mode === 'landslide' ? 'bg-orange-500/20' : 'bg-red-500/20'
+                }`}>
+                  <span className="text-4xl">{modeInfo.icon}</span>
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-3">
+                  {modeInfo.label} 모드 비활성
+                </h2>
+                <p className="text-slate-400 mb-4">
+                  현재 기상 조건이 {modeInfo.label} 재난 발생 조건에 해당하지 않습니다.
+                </p>
+                <div className={`inline-block px-4 py-2 rounded-lg text-sm ${
+                  mode === 'winter' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                  mode === 'summer' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                  mode === 'landslide' ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' :
+                  'bg-red-500/20 text-red-300 border border-red-500/30'
+                }`}>
+                  {weatherCondition.modeReasons[mode as keyof typeof weatherCondition.modeReasons]?.reason}
+                </div>
+                <div className="mt-6 text-sm text-slate-500">
+                  현재 기온: {weatherCondition.current.temperature.toFixed(1)}°C | {weatherCondition.current.sky}
+                  {weatherCondition.current.precipitationType !== '없음' && ` | ${weatherCondition.current.precipitationType}`}
+                </div>
+                {weatherCondition.recommendedMode && (
+                  <button
+                    onClick={() => handleModeChange(weatherCondition.recommendedMode as OperationMode)}
+                    className={`mt-4 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      weatherCondition.recommendedMode === 'winter' ? 'bg-purple-500 hover:bg-purple-600' :
+                      weatherCondition.recommendedMode === 'summer' ? 'bg-blue-500 hover:bg-blue-600' :
+                      weatherCondition.recommendedMode === 'landslide' ? 'bg-orange-500 hover:bg-orange-600' :
+                      'bg-red-500 hover:bg-red-600'
+                    } text-white`}
+                  >
+                    권장 모드로 전환: {MODE_INFO[weatherCondition.recommendedMode].label}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Quick Actions */}
           <div className="absolute top-4 right-4 flex gap-2 z-[500]">

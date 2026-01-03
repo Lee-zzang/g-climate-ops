@@ -20,52 +20,133 @@ import {
 } from '@/types/advisor';
 
 // ============================================
+// 경기도 주요 장비 거점 위치
+// ============================================
+
+const EQUIPMENT_BASES: Record<string, { name: string; location: [number, number] }> = {
+  suwon: { name: '수원 중앙거점', location: [37.2636, 127.0286] },
+  seongnam: { name: '성남 거점', location: [37.4200, 127.1267] },
+  yongin: { name: '용인 거점', location: [37.2411, 127.1776] },
+  anyang: { name: '안양 거점', location: [37.3943, 126.9568] },
+  ansan: { name: '안산 거점', location: [37.3219, 126.8309] },
+  goyang: { name: '고양 북부거점', location: [37.6584, 126.8320] },
+  bucheon: { name: '부천 거점', location: [37.5034, 126.7660] },
+  pyeongtaek: { name: '평택 남부거점', location: [36.9921, 127.0857] },
+  uijeongbu: { name: '의정부 거점', location: [37.7381, 127.0337] },
+  hwaseong: { name: '화성 거점', location: [37.1994, 126.8312] },
+  gimpo: { name: '김포 거점', location: [37.6152, 126.7156] },
+  paju: { name: '파주 거점', location: [37.7126, 126.7610] },
+};
+
+// ============================================
 // 모의 자원 데이터
 // ============================================
 
 export function getMockResources(mode: OperationMode): ResourceSummary[] {
   const baseResources: Record<OperationMode, ResourceSummary[]> = {
     winter: [
-      { type: '제설차', total: 15, available: 8, deployed: 5, maintenance: 2 },
-      { type: '구급차', total: 10, available: 7, deployed: 2, maintenance: 1 },
+      { type: '제설차', total: 24, available: 12, deployed: 8, maintenance: 4 },
+      { type: '구급차', total: 15, available: 10, deployed: 4, maintenance: 1 },
     ],
     summer: [
-      { type: '양수기', total: 12, available: 6, deployed: 4, maintenance: 2 },
-      { type: '구급차', total: 10, available: 6, deployed: 3, maintenance: 1 },
-      { type: '소방차', total: 8, available: 5, deployed: 2, maintenance: 1 },
+      { type: '양수기', total: 20, available: 10, deployed: 7, maintenance: 3 },
+      { type: '구급차', total: 15, available: 9, deployed: 5, maintenance: 1 },
+      { type: '소방차', total: 12, available: 7, deployed: 4, maintenance: 1 },
     ],
     landslide: [
-      { type: '굴착기', total: 8, available: 4, deployed: 3, maintenance: 1 },
-      { type: '구급차', total: 10, available: 5, deployed: 4, maintenance: 1 },
-      { type: '소방차', total: 8, available: 4, deployed: 3, maintenance: 1 },
+      { type: '굴착기', total: 15, available: 8, deployed: 5, maintenance: 2 },
+      { type: '구급차', total: 15, available: 8, deployed: 6, maintenance: 1 },
+      { type: '소방차', total: 12, available: 6, deployed: 5, maintenance: 1 },
     ],
     heat: [
-      { type: '이동쉼터', total: 10, available: 5, deployed: 4, maintenance: 1 },
-      { type: '구급차', total: 10, available: 6, deployed: 3, maintenance: 1 },
+      { type: '이동쉼터', total: 18, available: 10, deployed: 6, maintenance: 2 },
+      { type: '구급차', total: 15, available: 10, deployed: 4, maintenance: 1 },
     ],
   };
 
   return baseResources[mode];
 }
 
-export function getMockVehicles(mode: OperationMode): Vehicle[] {
-  const vehicleType = MODE_INFO[mode].vehicle as VehicleType;
-  const baseLocations: [number, number][] = [
-    [37.2636, 127.0286],
-    [37.3595, 127.1086],
-    [37.4292, 126.9876],
-    [37.5034, 126.7660],
-    [37.3180, 126.8309],
-  ];
+// 상세 장비 더미데이터
+interface DetailedVehicle extends Vehicle {
+  baseName: string;
+  fuelLevel: number;
+  lastMaintenance: string;
+  capacity?: string;
+  equipment?: string[];
+}
 
-  return baseLocations.map((loc, idx) => ({
-    id: `${vehicleType}-${String(idx + 1).padStart(2, '0')}`,
-    type: vehicleType,
-    name: `${vehicleType} ${idx + 1}호`,
-    status: idx < 2 ? '대기' : idx < 4 ? '출동중' : '작업중',
-    location: loc,
-    driver: `기사${idx + 1}`,
-    eta: idx < 2 ? 0 : Math.floor(Math.random() * 30) + 5,
+export function getMockDetailedVehicles(mode: OperationMode): DetailedVehicle[] {
+  const vehicleType = MODE_INFO[mode].vehicle as VehicleType;
+  const vehicles: DetailedVehicle[] = [];
+
+  const vehicleConfigs: Record<OperationMode, { bases: string[]; count: number; equipment: string[] }> = {
+    winter: {
+      bases: ['suwon', 'seongnam', 'goyang', 'anyang', 'pyeongtaek', 'uijeongbu', 'bucheon', 'gimpo'],
+      count: 3,
+      equipment: ['염화칼슘 살포기', '제설삽', 'GPS 추적기'],
+    },
+    summer: {
+      bases: ['suwon', 'ansan', 'bucheon', 'seongnam', 'yongin', 'hwaseong', 'gimpo'],
+      count: 3,
+      equipment: ['대용량펌프', '호스 200m', '발전기'],
+    },
+    landslide: {
+      bases: ['uijeongbu', 'paju', 'yongin', 'goyang', 'seongnam'],
+      count: 3,
+      equipment: ['굴삭버킷', '유압브레이커', '토사운반차'],
+    },
+    heat: {
+      bases: ['suwon', 'anyang', 'bucheon', 'seongnam', 'goyang', 'ansan', 'yongin', 'pyeongtaek', 'uijeongbu'],
+      count: 2,
+      equipment: ['에어컨', '음료수 냉장고', '의료키트'],
+    },
+  };
+
+  const config = vehicleConfigs[mode];
+  const statuses: Vehicle['status'][] = ['대기', '대기', '출동중', '작업중', '복귀중'];
+  const drivers = ['김철수', '이영희', '박민수', '최지현', '정우성', '한소희', '강동원', '송혜교'];
+
+  let vehicleIdx = 1;
+  config.bases.forEach((baseKey) => {
+    const base = EQUIPMENT_BASES[baseKey];
+    if (!base) return;
+
+    for (let i = 0; i < config.count; i++) {
+      const status = statuses[Math.floor(Math.random() * statuses.length)];
+      const offsetLat = (Math.random() - 0.5) * 0.02;
+      const offsetLng = (Math.random() - 0.5) * 0.02;
+
+      vehicles.push({
+        id: `${vehicleType.charAt(0).toUpperCase()}${String(vehicleIdx).padStart(3, '0')}`,
+        type: vehicleType,
+        name: `${vehicleType} ${vehicleIdx}호`,
+        status,
+        location: [base.location[0] + offsetLat, base.location[1] + offsetLng],
+        baseName: base.name,
+        driver: drivers[Math.floor(Math.random() * drivers.length)],
+        eta: status === '대기' ? 0 : Math.floor(Math.random() * 25) + 5,
+        fuelLevel: Math.floor(Math.random() * 40) + 60,
+        lastMaintenance: `2025-12-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
+        capacity: mode === 'heat' ? `${Math.floor(Math.random() * 10) + 15}명` : undefined,
+        equipment: config.equipment,
+      });
+      vehicleIdx++;
+    }
+  });
+
+  return vehicles;
+}
+
+export function getMockVehicles(mode: OperationMode): Vehicle[] {
+  return getMockDetailedVehicles(mode).map((v) => ({
+    id: v.id,
+    type: v.type,
+    name: v.name,
+    status: v.status,
+    location: v.location,
+    driver: v.driver,
+    eta: v.eta,
   }));
 }
 
@@ -75,6 +156,205 @@ export function getMockPersonnel(): Personnel {
     onDuty: 45,
     deployed: 28,
     available: 17,
+  };
+}
+
+// ============================================
+// AI 우선 배치 건의 시스템
+// ============================================
+
+/**
+ * 두 좌표 간 거리 계산 (Haversine 공식, km)
+ */
+function calculateDistance(
+  coord1: [number, number],
+  coord2: [number, number]
+): number {
+  const R = 6371; // 지구 반경 (km)
+  const dLat = ((coord2[0] - coord1[0]) * Math.PI) / 180;
+  const dLon = ((coord2[1] - coord1[1]) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((coord1[0] * Math.PI) / 180) *
+      Math.cos((coord2[0] * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * 예상 도착 시간 계산 (분)
+ */
+function calculateETA(distanceKm: number, status: Vehicle['status']): number {
+  const avgSpeedKmh = 40; // 평균 속도 (도심 기준)
+  const baseMinutes = (distanceKm / avgSpeedKmh) * 60;
+
+  // 상태별 추가 시간
+  const statusDelay: Record<Vehicle['status'], number> = {
+    '대기': 2, // 출발 준비 시간
+    '출동중': 0,
+    '작업중': 15, // 작업 완료 후 이동
+    '복귀중': 10, // 복귀 후 재출발
+    '정비중': 60, // 정비 완료 대기
+  };
+
+  return Math.round(baseMinutes + (statusDelay[status] || 0));
+}
+
+export interface DeploymentSuggestion {
+  id: string;
+  priority: 'critical' | 'high' | 'medium';
+  vehicle: Vehicle;
+  targetZone: RiskZone;
+  distance: number; // km
+  estimatedArrival: number; // minutes
+  reason: string;
+  alternativeVehicles?: { id: string; name: string; eta: number }[];
+}
+
+/**
+ * AI 우선 배치 건의 생성
+ * 위험 지역과 가용 장비를 분석하여 최적 배치 건의
+ */
+export function generateDeploymentSuggestions(
+  mode: OperationMode,
+  zones: RiskZone[],
+  vehicles: Vehicle[]
+): DeploymentSuggestion[] {
+  const suggestions: DeploymentSuggestion[] = [];
+  const modeInfo = MODE_INFO[mode];
+
+  // 고위험 구역만 필터 (위험도 70 이상)
+  const criticalZones = zones
+    .filter((z) => z.risk_score >= 70 && z.source_layer !== 'swtr_rstar')
+    .sort((a, b) => b.risk_score - a.risk_score);
+
+  // 가용 장비 (대기 또는 복귀중)
+  const availableVehicles = vehicles.filter(
+    (v) => v.status === '대기' || v.status === '복귀중'
+  );
+
+  // 이미 배치된 장비 ID 추적
+  const assignedVehicleIds = new Set<string>();
+
+  criticalZones.forEach((zone, zoneIdx) => {
+    if (zoneIdx >= 5) return; // 상위 5개 구역만
+
+    // 각 장비까지의 거리 계산
+    const vehicleDistances = availableVehicles
+      .filter((v) => !assignedVehicleIds.has(v.id))
+      .map((vehicle) => ({
+        vehicle,
+        distance: calculateDistance(zone.coordinates, vehicle.location),
+        eta: calculateETA(
+          calculateDistance(zone.coordinates, vehicle.location),
+          vehicle.status
+        ),
+      }))
+      .sort((a, b) => a.eta - b.eta);
+
+    if (vehicleDistances.length === 0) return;
+
+    const nearest = vehicleDistances[0];
+    assignedVehicleIds.add(nearest.vehicle.id);
+
+    // 대안 장비들
+    const alternatives = vehicleDistances.slice(1, 4).map((v) => ({
+      id: v.vehicle.id,
+      name: v.vehicle.name,
+      eta: v.eta,
+    }));
+
+    const priority: DeploymentSuggestion['priority'] =
+      zone.risk_score >= 90 ? 'critical' : zone.risk_score >= 80 ? 'high' : 'medium';
+
+    const reasonTemplates: Record<OperationMode, (zone: RiskZone) => string> = {
+      winter: (z) =>
+        `${z.name} 결빙 위험도 ${z.risk_score}%. ${nearest.vehicle.name}(${nearest.vehicle.driver})이 ${nearest.distance.toFixed(1)}km 거리에서 약 ${nearest.eta}분 내 도착 가능. 염화칼슘 선제 살포 권고.`,
+      summer: (z) =>
+        `${z.name} 침수 위험도 ${z.risk_score}%. ${nearest.vehicle.name}이 약 ${nearest.eta}분 내 도착하여 배수 작업 가능. 인근 지하차도 통제 검토 필요.`,
+      landslide: (z) =>
+        `${z.name} 산사태 1등급 구역. ${nearest.vehicle.name} 약 ${nearest.eta}분 내 현장 도착 예상. 주민 대피 완료 후 토사 제거 작업 준비.`,
+      heat: (z) =>
+        `${z.name} 폭염 취약지역. ${nearest.vehicle.name}(수용 ${Math.floor(Math.random() * 10 + 15)}명) 배치 시 ${nearest.eta}분 내 운영 시작 가능. 독거노인 우선 안내.`,
+    };
+
+    suggestions.push({
+      id: `DEPLOY-${zone.id}`,
+      priority,
+      vehicle: nearest.vehicle,
+      targetZone: zone,
+      distance: Math.round(nearest.distance * 10) / 10,
+      estimatedArrival: nearest.eta,
+      reason: reasonTemplates[mode](zone),
+      alternativeVehicles: alternatives,
+    });
+  });
+
+  return suggestions;
+}
+
+/**
+ * 전체 배치 현황 요약
+ */
+export interface DeploymentSummary {
+  totalVehicles: number;
+  availableVehicles: number;
+  deployedVehicles: number;
+  criticalZonesCount: number;
+  coveredZonesCount: number;
+  avgResponseTime: number; // 분
+  recommendations: string[];
+}
+
+export function getDeploymentSummary(
+  mode: OperationMode,
+  zones: RiskZone[],
+  vehicles: Vehicle[]
+): DeploymentSummary {
+  const modeInfo = MODE_INFO[mode];
+  const criticalZones = zones.filter((z) => z.risk_score >= 80 && z.source_layer !== 'swtr_rstar');
+  const availableVehicles = vehicles.filter((v) => v.status === '대기');
+  const deployedVehicles = vehicles.filter((v) => v.status === '출동중' || v.status === '작업중');
+
+  const suggestions = generateDeploymentSuggestions(mode, zones, vehicles);
+  const avgETA = suggestions.length > 0
+    ? Math.round(suggestions.reduce((sum, s) => sum + s.estimatedArrival, 0) / suggestions.length)
+    : 0;
+
+  const recommendations: string[] = [];
+
+  if (criticalZones.length > availableVehicles.length) {
+    recommendations.push(
+      `고위험 구역(${criticalZones.length}개) 대비 가용 ${modeInfo.vehicle} 부족. 추가 동원 검토 필요.`
+    );
+  }
+
+  if (avgETA > 20) {
+    recommendations.push(
+      `평균 대응 시간 ${avgETA}분으로 목표(15분) 초과. 전진 배치 검토.`
+    );
+  }
+
+  if (deployedVehicles.length > availableVehicles.length * 2) {
+    recommendations.push(
+      `현재 투입 장비 과다. 교대 인력 배치 및 정비 일정 조정 필요.`
+    );
+  }
+
+  if (criticalZones.length === 0) {
+    recommendations.push(`현재 고위험 구역 없음. 예방 순찰 및 장비 점검 권고.`);
+  }
+
+  return {
+    totalVehicles: vehicles.length,
+    availableVehicles: availableVehicles.length,
+    deployedVehicles: deployedVehicles.length,
+    criticalZonesCount: criticalZones.length,
+    coveredZonesCount: Math.min(criticalZones.length, availableVehicles.length),
+    avgResponseTime: avgETA,
+    recommendations,
   };
 }
 

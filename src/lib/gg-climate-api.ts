@@ -346,18 +346,91 @@ export async function getLayerWithFilter(
 // 유틸리티 함수
 // ============================================
 
+// 경기도 좌표 범위 (위도, 경도) - 실제 경기도 행정구역 기준
+const GG_BOUNDS = {
+  lat: { min: 36.95, max: 38.05 }, // 평택 남단 ~ 연천 북단
+  lng: { min: 126.35, max: 127.85 }, // 김포 서단 ~ 가평 동단
+};
+
+/**
+ * 좌표가 경기도 범위 내인지 확인
+ */
+export function isValidGGCoordinate(lat: number, lng: number): boolean {
+  return (
+    lat >= GG_BOUNDS.lat.min &&
+    lat <= GG_BOUNDS.lat.max &&
+    lng >= GG_BOUNDS.lng.min &&
+    lng <= GG_BOUNDS.lng.max
+  );
+}
+
+/**
+ * 경기도 주요 지역 좌표 (폴백용)
+ */
+const GG_REGION_COORDS: Record<string, [number, number]> = {
+  수원: [37.2636, 127.0286],
+  성남: [37.4200, 127.1267],
+  용인: [37.2411, 127.1776],
+  안양: [37.3943, 126.9568],
+  안산: [37.3219, 126.8309],
+  고양: [37.6584, 126.8320],
+  부천: [37.5034, 126.7660],
+  광명: [37.4786, 126.8644],
+  평택: [36.9921, 127.0857],
+  시흥: [37.3800, 126.8029],
+  파주: [37.7126, 126.7610],
+  의정부: [37.7381, 127.0337],
+  김포: [37.6152, 126.7156],
+  화성: [37.1994, 126.8312],
+  광주: [37.4095, 127.2550],
+  군포: [37.3617, 126.9352],
+  오산: [37.1498, 127.0697],
+  하남: [37.5393, 127.2148],
+  양주: [37.7853, 127.0456],
+  이천: [37.2723, 127.4349],
+  구리: [37.5943, 127.1295],
+  남양주: [37.6360, 127.2166],
+  포천: [37.8949, 127.2003],
+  양평: [37.4917, 127.4877],
+  동두천: [37.9035, 127.0604],
+  과천: [37.4292, 126.9876],
+  의왕: [37.3449, 126.9683],
+  여주: [37.2983, 127.6375],
+  가평: [37.8315, 127.5095],
+  연천: [38.0965, 127.0747],
+  경기: [37.4138, 127.0296],
+};
+
+/**
+ * 지역명에서 좌표 추출 (폴백용)
+ */
+function getCoordsByRegionName(name: string): [number, number] | null {
+  for (const [region, coords] of Object.entries(GG_REGION_COORDS)) {
+    if (name.includes(region)) {
+      // 약간의 랜덤 오프셋 추가 (같은 지역 마커가 겹치지 않도록)
+      const offset = () => (Math.random() - 0.5) * 0.05;
+      return [coords[0] + offset(), coords[1] + offset()];
+    }
+  }
+  return null;
+}
+
 /**
  * GeoJSON 좌표에서 중심점 계산
  */
-export function getCenterFromGeometry(geometry: GeoJSONFeature['geometry']): [number, number] {
+export function getCenterFromGeometry(
+  geometry: GeoJSONFeature['geometry'],
+  properties?: Record<string, unknown>
+): [number, number] {
   try {
     const coords = geometry.coordinates;
+    let lat: number;
+    let lng: number;
 
     if (geometry.type === 'Point') {
-      return [coords[1] as number, coords[0] as number]; // [lat, lng]
-    }
-
-    if (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') {
+      lng = coords[0] as number;
+      lat = coords[1] as number;
+    } else if (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') {
       // 첫 번째 링의 좌표들
       let ring: number[][];
       if (geometry.type === 'Polygon') {
@@ -366,26 +439,71 @@ export function getCenterFromGeometry(geometry: GeoJSONFeature['geometry']): [nu
         ring = (coords[0] as number[][][])[0];
       }
 
-      if (!ring || ring.length === 0) return [37.4, 127.0];
+      if (!ring || ring.length === 0) {
+        return getDefaultCoordFromProperties(properties);
+      }
 
       const sum = ring.reduce(
         (acc, coord) => [acc[0] + coord[0], acc[1] + coord[1]],
         [0, 0]
       );
 
-      return [sum[1] / ring.length, sum[0] / ring.length]; // [lat, lng]
-    }
-
-    if (geometry.type === 'LineString') {
+      lng = sum[0] / ring.length;
+      lat = sum[1] / ring.length;
+    } else if (geometry.type === 'LineString') {
       const lineCoords = coords as number[][];
       const mid = Math.floor(lineCoords.length / 2);
-      return [lineCoords[mid][1], lineCoords[mid][0]];
+      lng = lineCoords[mid][0];
+      lat = lineCoords[mid][1];
+    } else if (geometry.type === 'MultiLineString') {
+      const lines = coords as number[][][];
+      const firstLine = lines[0];
+      const mid = Math.floor(firstLine.length / 2);
+      lng = firstLine[mid][0];
+      lat = firstLine[mid][1];
+    } else {
+      return getDefaultCoordFromProperties(properties);
     }
 
-    return [37.4, 127.0]; // 경기도 중심 기본값
+    // 좌표가 경기도 범위 내인지 확인
+    if (isValidGGCoordinate(lat, lng)) {
+      return [lat, lng];
+    }
+
+    // 좌표가 뒤집혀 있는 경우 (일부 API에서 발생)
+    if (isValidGGCoordinate(lng, lat)) {
+      return [lng, lat];
+    }
+
+    // 좌표가 범위 밖이면 지역명으로 폴백
+    return getDefaultCoordFromProperties(properties);
   } catch {
-    return [37.4, 127.0];
+    return getDefaultCoordFromProperties(properties);
   }
+}
+
+/**
+ * properties에서 지역명을 추출하여 기본 좌표 반환
+ */
+function getDefaultCoordFromProperties(
+  properties?: Record<string, unknown>
+): [number, number] {
+  if (!properties) {
+    return [37.4138 + (Math.random() - 0.5) * 0.3, 127.0296 + (Math.random() - 0.5) * 0.3];
+  }
+
+  // 지역명 필드들 확인
+  const nameFields = ['sgg_nm', 'SGG_NM', 'emd_nm', 'EMD_NM', 'nm', 'NM', 'addr', 'ADDR'];
+  for (const field of nameFields) {
+    const value = properties[field];
+    if (value && typeof value === 'string') {
+      const coords = getCoordsByRegionName(value);
+      if (coords) return coords;
+    }
+  }
+
+  // 기본값: 경기도 내 랜덤 위치
+  return [37.4138 + (Math.random() - 0.5) * 0.3, 127.0296 + (Math.random() - 0.5) * 0.3];
 }
 
 /**
@@ -475,9 +593,9 @@ export async function analyzeSummerRisks(): Promise<RiskAnalysisResult[]> {
     const floodData = await getFloodMap(100, 1, 200);
 
     floodData.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
-      const riskScore = calculateRiskScore(feature, 'flood');
       const props = feature.properties;
+      const center = getCenterFromGeometry(feature.geometry, props);
+      const riskScore = calculateRiskScore(feature, 'flood');
 
       if (riskScore >= 50) {
         results.push({
@@ -506,8 +624,8 @@ export async function analyzeSummerRisks(): Promise<RiskAnalysisResult[]> {
     const impervData = await getImperviousSurface(100);
 
     impervData.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
       const props = feature.properties;
+      const center = getCenterFromGeometry(feature.geometry, props);
       const impvRate = (props.impvs_rate as number) || (props.IMPVS_RATE as number) || 0;
 
       if (impvRate >= 80) {
@@ -544,9 +662,9 @@ export async function analyzeWinterRisks(): Promise<RiskAnalysisResult[]> {
     const slopeData = await getSteepSlope(200);
 
     slopeData.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
-      const riskScore = calculateRiskScore(feature, 'ice');
       const props = feature.properties;
+      const center = getCenterFromGeometry(feature.geometry, props);
+      const riskScore = calculateRiskScore(feature, 'ice');
 
       results.push({
         id: `ICE-SLOPE-${feature.id || idx}`,
@@ -572,8 +690,8 @@ export async function analyzeWinterRisks(): Promise<RiskAnalysisResult[]> {
     const altitudeData = await getHighAltitude(150);
 
     altitudeData.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
       const props = feature.properties;
+      const center = getCenterFromGeometry(feature.geometry, props);
 
       results.push({
         id: `ICE-ALT-${feature.id || idx}`,
@@ -599,8 +717,8 @@ export async function analyzeWinterRisks(): Promise<RiskAnalysisResult[]> {
     const riverData = await getMountainRivers(100);
 
     riverData.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
       const props = feature.properties;
+      const center = getCenterFromGeometry(feature.geometry, props);
 
       results.push({
         id: `ICE-RIVER-${feature.id || idx}`,
@@ -625,8 +743,8 @@ export async function analyzeWinterRisks(): Promise<RiskAnalysisResult[]> {
     const roadData = await getRoads(100);
 
     roadData.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
       const props = feature.properties;
+      const center = getCenterFromGeometry(feature.geometry, props);
       const rdType = String(props.rd_type || props.RD_TYPE || '');
 
       // 고속도로, 국도만 필터링
@@ -666,8 +784,8 @@ export async function analyzeLandslideRisks(): Promise<RiskAnalysisResult[]> {
     const grade1Data = await getLandslideGrade1(200);
 
     grade1Data.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
       const props = feature.properties;
+      const center = getCenterFromGeometry(feature.geometry, props);
 
       results.push({
         id: `LANDSLIDE-G1-${feature.id || idx}`,
@@ -693,8 +811,8 @@ export async function analyzeLandslideRisks(): Promise<RiskAnalysisResult[]> {
     const weakData = await getLandslideWeakRegion(100);
 
     weakData.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
       const props = feature.properties;
+      const center = getCenterFromGeometry(feature.geometry, props);
 
       results.push({
         id: `LANDSLIDE-WEAK-${feature.id || idx}`,
@@ -717,31 +835,45 @@ export async function analyzeLandslideRisks(): Promise<RiskAnalysisResult[]> {
 
 /**
  * 폭염 모드 위험 분석
+ * - 기후취약지역의 폭염위험점수(htwv_dngr_scr) 기반
+ * - 무더위쉼터는 기존 인프라로 별도 표시
  */
 export async function analyzeHeatRisks(): Promise<RiskAnalysisResult[]> {
   const results: RiskAnalysisResult[] = [];
 
   try {
-    // 1. 기후취약지역 스코어
-    const climateData = await getClimateWeakRegion(200);
+    // 1. 기후취약지역 - 폭염 위험 점수 기반
+    const climateData = await getClimateWeakRegion(300);
 
     climateData.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
       const props = feature.properties;
-      const score = (props.score as number) || (props.SCORE as number) || 50;
+      const center = getCenterFromGeometry(feature.geometry, props);
 
-      if (score >= 60) {
+      // 폭염 위험 점수 (htwv_dngr_scr)
+      const heatScore = (props.htwv_dngr_scr as number) || (props.HTWV_DNGR_SCR as number) || 0;
+      const sggNm = (props.sgg_nm as string) || (props.SGG_NM as string) || '';
+      const stdgNm = (props.stdg_nm as string) || (props.STDG_NM as string) || '';
+      const locationName = stdgNm ? `${sggNm} ${stdgNm}` : sggNm || '경기도';
+
+      // 폭염 위험 점수가 50 이상인 지역만 표시
+      if (heatScore >= 50) {
+        const riskScore = Math.min(95, Math.round(heatScore));
         results.push({
-          id: `HEAT-WEAK-${feature.id || idx}`,
-          name: `기후취약지역`,
+          id: `HEAT-${feature.id || idx}`,
+          name: `${locationName} 폭염취약지역`,
           coordinates: center,
-          risk_score: Math.min(95, score),
-          reason: `기후취약 점수 ${score}점 - 폭염 시 취약계층 주의`,
-          status: score >= 80 ? '조치필요' : '조치중',
+          risk_score: riskScore,
+          reason: `폭염위험점수 ${heatScore.toFixed(1)}점. 취약계층(독거노인, 야외근로자) 밀집 추정. 이동쉼터 배치 권고.`,
+          status: riskScore >= 80 ? '조치필요' : riskScore >= 65 ? '조치중' : '완료',
           mode: 'heat',
           source_layer: 'clim_weak_rgn_scr',
           details: {
-            climate_score: score,
+            heat_score: heatScore,
+            sgg_nm: sggNm,
+            stdg_nm: stdgNm,
+            // 참고: 다른 위험 점수들
+            rain_score: props.hvyrain_dngr_scr,
+            landslide_score: props.ldsld_dngr_scr,
           },
         });
       }
@@ -750,28 +882,37 @@ export async function analyzeHeatRisks(): Promise<RiskAnalysisResult[]> {
     console.error('기후취약지역 데이터 조회 실패:', error);
   }
 
+  // 위험 지역을 점수순으로 정렬
+  results.sort((a, b) => b.risk_score - a.risk_score);
+
+  // 상위 위험지역 20개 + 무더위쉼터
+  const riskZones = results.slice(0, 20);
+
   try {
-    // 2. 무더위쉼터 (대피소)
-    const shelterData = await getHeatShelters(300);
+    // 2. 무더위쉼터 - 기존 인프라 (참고용)
+    const shelterData = await getHeatShelters(100);
 
     shelterData.features.forEach((feature, idx) => {
-      const center = getCenterFromGeometry(feature.geometry);
       const props = feature.properties;
+      const center = getCenterFromGeometry(feature.geometry, props);
+      const shelterName = (props.nm as string) || (props.NM as string) || '무더위쉼터';
+      const addr = (props.addr as string) || (props.ADDR as string) || '';
 
-      results.push({
+      riskZones.push({
         id: `SHELTER-${feature.id || idx}`,
-        name: props.nm as string || props.NM as string || '무더위쉼터',
+        name: shelterName,
         coordinates: center,
-        risk_score: 20, // 쉼터는 안전지역
-        reason: `무더위 대피소 - 주소: ${props.addr || props.ADDR || '정보없음'}`,
+        risk_score: 10, // 쉼터는 안전시설
+        reason: `기존 무더위쉼터 (${addr || '주소 미상'})`,
         status: '완료',
         mode: 'heat',
         source_layer: 'swtr_rstar',
         details: {
-          name: props.nm || props.NM,
-          address: props.addr || props.ADDR,
+          name: shelterName,
+          address: addr,
           tel: props.tel || props.TEL,
           capacity: props.capacity || props.CAPACITY,
+          type: '기존인프라',
         },
       });
     });
@@ -779,5 +920,5 @@ export async function analyzeHeatRisks(): Promise<RiskAnalysisResult[]> {
     console.error('무더위쉼터 데이터 조회 실패:', error);
   }
 
-  return results.slice(0, 30);
+  return riskZones;
 }
