@@ -203,7 +203,7 @@ export default function Home() {
           id: `inactive-${Date.now()}`,
           timestamp: new Date(),
           message: `⚠️ [조건 미충족] ${MODE_INFO[mode].label} 모드 비활성. ${reason}`,
-          type: 'warning',
+          type: 'alert',
         };
         setMessages([newMessage]);
       }
